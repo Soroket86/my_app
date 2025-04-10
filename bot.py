@@ -1,25 +1,33 @@
 from telegram import Bot, Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
 from telegram.utils.request import Request
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer, util
 import os
 import time
+import re
 
-# Загрузка текста
+# Загружаем текст
 with open("kol_dogovor.txt", "r", encoding="utf-8") as f:
     pdf_text = f.read()
 
-# Разделение на абзацы
-articles = [p.strip() for p in pdf_text.split("\n\n") if len(p.strip()) > 30]
+# Разделяем на статьи и разделы
+sections = re.split(r"(РАЗДЕЛ\s+\d+\..*|СТАТЬЯ\s+\d+\..*)", pdf_text, flags=re.IGNORECASE)
+articles = []
 
-vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(articles)
+for i in range(1, len(sections), 2):
+    header = sections[i].strip()
+    body = sections[i+1].strip() if i+1 < len(sections) else ""
+    articles.append(header + "\n" + body)
+
+# Инициализация модели
+print("🔍 Загрузка модели...")
+model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+article_embeddings = model.encode(articles, convert_to_tensor=True)
 
 def find_article(question):
-    q_vec = vectorizer.transform([question])
-    similarity = cosine_similarity(q_vec, X)
-    best_idx = similarity.argmax()
+    question_embedding = model.encode(question, convert_to_tensor=True)
+    similarities = util.cos_sim(question_embedding, article_embeddings)
+    best_idx = similarities.argmax()
     return articles[best_idx]
 
 def start(update: Update, context: CallbackContext):
@@ -32,13 +40,7 @@ def handle_question(update: Update, context: CallbackContext):
 
 def main():
     token = os.getenv("TELEGRAM_TOKEN")
-
-    # Увеличенные таймауты и контроль соединения
-    request = Request(
-        connect_timeout=10.0,
-        read_timeout=10.0,
-        con_pool_size=8
-    )
+    request = Request(connect_timeout=10.0, read_timeout=10.0, con_pool_size=8)
     bot = Bot(token=token, request=request)
 
     updater = Updater(bot=bot, use_context=True)
