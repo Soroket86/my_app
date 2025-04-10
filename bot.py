@@ -7,7 +7,7 @@ import os
 import time
 
 # Загрузка текста
-with open("kol_dogovor.txt", "r", encoding="cp1251") as f:
+with open("kol_dogovor.txt", "r", encoding="utf-8") as f:
     pdf_text = f.read()
 
 # Разделение на абзацы
