@@ -23,9 +23,8 @@ else:
     with open("kol_dogovor.txt", "r", encoding="utf-8") as f:
         pdf_text = f.read()
 
-# Разделение на статьи
-parts = re.split(r"(Статья\s+\d+[\.\:])", pdf_text)
-articles = [parts[i] + parts[i+1] for i in range(1, len(parts)-1, 2)]
+# Разделяем текст на абзацы (по двойному переносу строки)
+articles = [p.strip() for p in pdf_text.split("\n\n") if len(p.strip()) > 30]
 
 vectorizer = TfidfVectorizer()
 X = vectorizer.fit_transform(articles)
